@@ -1,0 +1,4 @@
+cargo:rustc-link-search=/Users/kb/Documents/intermittentC/redpanda/mem3/target/thumbv7em-none-eabihf/debug/build/mem3-adf648730c8b40c8/out
+cargo:rerun-if-changed=memory.x
+cargo:rustc-link-arg=--nmagic
+cargo:rustc-link-arg=-Tlink.x
