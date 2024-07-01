@@ -40,7 +40,7 @@ impl WARVisitor {
         if var.starts_with("*") {
             let ident = Ident::new(&var[1..], proc_macro2::Span::call_site());
             self.stmts.push(parse_quote! {
-                save_variables(#ident as *const _, std::mem::size_of_val(#ident));
+                save_variables(#ident as *const _, core::mem::size_of_val(#ident));
             });
         }else if var.contains("[") && var.ends_with("]") {
             // Handle array accesses like arr[i]
@@ -57,14 +57,14 @@ impl WARVisitor {
     
             let ident = Ident::new(array_name, proc_macro2::Span::call_site());
             self.stmts.push(parse_quote! {
-                save_variables(&#ident[#index_expr] as *const _, std::mem::size_of_val(&#ident[#index_expr]));
+                save_variables(&#ident[#index_expr] as *const _, core::mem::size_of_val(&#ident[#index_expr]));
             });
         }
         else{
             //println!("the idents are {:?}", var);
             let ident = Ident::new(&var, proc_macro2::Span::call_site());
             self.stmts.push(parse_quote! {
-                save_variables(&#ident as *const _, std::mem::size_of_val(&#ident));
+                save_variables(&#ident as *const _, core::mem::size_of_val(&#ident));
             });
         }
     }
@@ -127,7 +127,7 @@ impl WARVisitor {
                         }
                     }
                     _ => {
-                        println!(" rest of the test {:?}", reads);
+                        //println!(" rest of the test {:?}", reads);
                         let (sub_reads, _) = self.extract_vars_from_expr(expr);
                         reads.extend(sub_reads);
                     }
@@ -323,7 +323,7 @@ impl VisitMut for WARVisitor {
                                                 .collect();
 
                 for var in &unique_writes {
-                    println!("the vars in if {}",var);
+                    //println!("the vars in if {}",var);
                     self.add_emw_dependency(var);
                 }
                 self.branch_count = 0;
@@ -342,7 +342,7 @@ impl VisitMut for WARVisitor {
                         for w in &writes{
                             let ident = Ident::new(&w, proc_macro2::Span::call_site());
                             self.stmts.push(  parse_quote! {
-                                unsafe {save_variables(&#ident as *const _, std::mem::size_of_val(&#ident)); }
+                                unsafe {save_variables(&#ident as *const _, core::mem::size_of_val(&#ident)); }
                             });
                             }
                         }

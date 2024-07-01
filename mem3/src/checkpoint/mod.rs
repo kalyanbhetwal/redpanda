@@ -16,6 +16,9 @@ use volatile::Volatile;
 pub static mut transcation_log: u32 = 0x60004000; 
 pub static mut execution_mode: bool = true;  //1. true is jit 2.flase is static 
 
+static mut counter: *mut u8 = (0x60004000-2) as *mut u8 ;
+
+
 pub fn save_variables(mem_loc: *const u8, size: usize) {
     unsafe{
         for i in 0..4 {
@@ -33,12 +36,14 @@ pub fn save_variables(mem_loc: *const u8, size: usize) {
             ptr::write( (transcation_log+i as u32) as *mut u8 , byte);   
         }
         transcation_log =  transcation_log + size as u32;
+
+        unsafe{*counter +=1;}
     }
     hprintln!("Address: {:p}, Size: {} bytes", mem_loc, size);
 }
 
 pub fn start_atomic(){
-    //checkpoint(true);
+    checkpoint(true);
     //undo or redo updates
     //memcopy some variables
            //unsafe{ptr::write(transcation_log as *mut u8, 1);} //still debating this
@@ -369,7 +374,12 @@ pub fn erase_all(flash: &mut FLASH){
 
 pub fn restore_globals(){
     unsafe{
+        let mut restore_ctr:u8 = 0;
         loop {
+            if *counter == restore_ctr {
+                break;
+            }
+
             let mut combined:u32 = 0;
             for i in 0..4 {
                 combined |= (ptr::read((transcation_log + i) as *const u32) << (i * 8));
@@ -384,10 +394,12 @@ pub fn restore_globals(){
             combined =  combined + size as u32;
 
             let end = ptr::read(combined as *const u8);
-            
-            if end == 0xFB{
-                break;
-            }
+            restore_ctr += 1;
+
+  
+            // if end == 0xFB{
+            //     break;
+            // }
         }
     }
 }
@@ -421,6 +433,7 @@ pub fn restore()->bool{
 
         if  ptr::read_volatile(flash_start_address as *const u32) == 0xDEAD_BEEF{
             restore_globals();
+            *counter = 0;
         }
 
         // let mut end_address = 0x0801_0004 + packet_size;
