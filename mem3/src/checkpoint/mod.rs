@@ -15,35 +15,43 @@ use volatile::Volatile;
 
 pub static mut transcation_log: u32 = 0x60004000; 
 pub static mut execution_mode: bool = true;  //1. true is jit 2.flase is static 
+pub static mut counter: u32= 0x60003002;
 
-static mut counter: *mut u8 = (0x60004000-2) as *mut u8 ;
 
 
-pub fn save_variables(mem_loc: *const u8, size: usize) {
+pub fn save_variables<T>(mem_loc: *const T, size: usize) {
     unsafe{
+        let mem_loc_u8 = mem_loc as *const u8;
         for i in 0..4 {
-            let byte = (mem_loc as u32 >> (i * 8)) as u8; // Extract the byte at position i
-            ptr::write((transcation_log+i as u32) as *mut u8 , byte);
+            let byte = (mem_loc_u8 as u32 >> (i * 8)) as u8; // Extract the byte at position i
+            hprintln!("bytes {:0x}", byte);
+            ptr::write((transcation_log+2 *i as u32) as *mut u8 , byte);
         }
-        transcation_log += 4;
+        transcation_log += 2*4;
 
         ptr::write(transcation_log as *mut u8 , size as u8);
 
-        transcation_log += 1;
+        transcation_log += 2*1; //adding 2 because of issues in fram where only even address are being written
 
         for i in 0..size{
-            let byte = *mem_loc.add(i); 
-            ptr::write( (transcation_log+i as u32) as *mut u8 , byte);   
+            let byte = *mem_loc_u8.add(i); 
+            hprintln!("the logged byte {}", byte);
+            ptr::write( (transcation_log+2*i as u32) as *mut u8 , byte);   
         }
-        transcation_log =  transcation_log + size as u32;
+        transcation_log =  transcation_log + 2*size as u32;
 
-        unsafe{*counter +=1;}
+        let mut a = ptr::read(counter as *const u8);
+        hprintln!("the read value before logging {}",a );
+        a = a + 1;
+        ptr::write(counter as *mut u8, a);
+        let b = ptr::read(counter as *const u8 );
+        hprintln!("After logging counter is {}", b);
     }
     hprintln!("Address: {:p}, Size: {} bytes", mem_loc, size);
 }
 
 pub fn start_atomic(){
-    checkpoint(true);
+    //checkpoint(true);
     //undo or redo updates
     //memcopy some variables
            //unsafe{ptr::write(transcation_log as *mut u8, 1);} //still debating this
@@ -376,7 +384,7 @@ pub fn restore_globals(){
     unsafe{
         let mut restore_ctr:u8 = 0;
         loop {
-            if *counter == restore_ctr {
+            if ptr::read(counter as *mut u8)== restore_ctr {
                 break;
             }
 
@@ -433,7 +441,7 @@ pub fn restore()->bool{
 
         if  ptr::read_volatile(flash_start_address as *const u32) == 0xDEAD_BEEF{
             restore_globals();
-            *counter = 0;
+            ptr::write(counter as *mut u8,0);
         }
 
         // let mut end_address = 0x0801_0004 + packet_size;

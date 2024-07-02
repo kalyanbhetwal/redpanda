@@ -17,17 +17,17 @@ use volatile::Volatile;
 use cortex_m::peripheral::NVIC;
 
 mod checkpoint;
-use checkpoint::{checkpoint, restore, delete_pg, delete_all_pg, transcation_log, execution_mode,start_atomic, end_atomic};
+use checkpoint::{checkpoint, restore, delete_pg, delete_all_pg, transcation_log, execution_mode, counter,start_atomic, end_atomic};
 use instrument::my_proc_macro;
 
 #[link_section = ".fram_section"]
-static mut x:u8 = 1;
+static mut x:u16 = 1;
 #[link_section = ".fram_section"]
-static mut y:u8 = 3;
+static mut y:u16 = 3;
 #[link_section = ".fram_section"]
-static mut z:u8 = 2;
+static mut z:u16 = 2;
 #[link_section = ".fram_section"]
-static mut t:u8 = 5; //change to assign a random number
+static mut t:u16 = 5; //change to assign a random number
 
 #[link_section = ".fram_section"]
 static mut rnd_array:[u16;5] = [10,12,14,15,2];
@@ -114,34 +114,157 @@ fn initialization(){
     //   dp.RCC.ahbenr.modify(|_, w| w.flitfen().set_bit());  
     //   dp.RCC.ahbenr.modify(|_, w| w.fmcen().set_bit());  
 
-      dp.RCC.ahbenr.write(|w| unsafe{w.bits(0xf10034)});
- 
-      dp.RCC.apb2enr.modify(|_, w| w.syscfgen().set_bit());
-      dp.RCC.apb1enr.modify(|_, w| w.pwren().set_bit());
-   
-      dp.GPIOD.moder.write(|w| unsafe{w.bits(0xa0008a0a)});
-      dp.GPIOD.ospeedr.write(|w| unsafe { w.bits(0xf000cf0f) });
-      dp.GPIOD.afrl.write(|w| unsafe { w.bits(0xc0cc00cc) });
-      dp.GPIOD.afrh.write(|w| unsafe { w.bits(0xcc000000) });
+    dp.RCC.ahbenr.modify(|_, w| w.iopden().set_bit());
+    dp.RCC.ahbenr.modify(|_, w| w.iopeen().set_bit());
+    dp.RCC.ahbenr.modify(|_, w| w.iopfen().set_bit());
+    dp.RCC.ahbenr.modify(|_, w| w.iopgen().set_bit());
+    dp.RCC.ahbenr.modify(|_, w| w.iophen().set_bit());  
+    dp.RCC.ahbenr.modify(|_, w| w.sramen().set_bit());  
+    dp.RCC.ahbenr.modify(|_, w| w.flitfen().set_bit());  
+    dp.RCC.ahbenr.modify(|_, w| w.fmcen().set_bit());  
 
-   
-      dp.GPIOE.moder.write(|w| unsafe{w.bits(0x2a8000)});
-      dp.GPIOE.ospeedr.write(|w| unsafe { w.bits(0xff000ff0) });
-      dp.GPIOE.afrl.write(|w| unsafe { w.bits(0xc0000000) });
-      dp.GPIOE.afrh.write(|w| unsafe { w.bits(0xccc) });
-   
-      dp.GPIOF.moder.write(|w| unsafe{w.bits(0xaa000aa0)});
-      dp.GPIOF.ospeedr.write(|w| unsafe { w.bits(0x3fc000) });
-      dp.GPIOF.afrl.write(|w| unsafe { w.bits(0xcccc00) });
-      dp.GPIOF.afrh.write(|w| unsafe { w.bits(0xccc) });
-   
-      dp.GPIOG.moder.write(|w| unsafe{w.bits(0x2aa)});
-      dp.GPIOG.ospeedr.write(|w| unsafe { w.bits(0x3ff) });
-      dp.GPIOG.afrl.write(|w| unsafe { w.bits(0xccccc) });
-   
-      dp.GPIOH.moder.write(|w| unsafe{w.bits(0xa)});
-      dp.GPIOH.ospeedr.write(|w| unsafe { w.bits(0xf) });
-      dp.GPIOH.afrl.write(|w| unsafe { w.bits(0xcc) });
+
+    dp.RCC.apb2enr.modify(|_, w| w.syscfgen().set_bit());
+    dp.RCC.apb1enr.modify(|_, w| w.pwren().set_bit());
+
+  let mut gpiod = dp.GPIOD;
+  let mut gpioe = dp.GPIOE;
+  let mut gpiof = dp.GPIOF;
+  let mut gpiog = dp.GPIOG;
+  let mut gpioh = dp.GPIOH;
+
+    gpioh.moder.modify(|_, w| {w.moder0().alternate()});
+    gpioh.afrl.modify(|_, w| {  w.afrl0().af12()});
+    gpioh.ospeedr.modify(|_, w| w.ospeedr0().very_high_speed());
+
+
+    gpioh.moder.modify(|_, w| {w.moder1().alternate()});
+    gpioh.afrl.modify(|_, w| {  w.afrl1().af12()});
+    gpioh.ospeedr.modify(|_, w| w.ospeedr1().very_high_speed());
+
+
+    gpiof.moder.modify(|_, w| {w.moder2().alternate()});
+    gpiof.afrl.modify(|_, w| {  w.afrl2().af12()});
+    gpiof.ospeedr.modify(|_, w| w.ospeedr2().very_high_speed());
+
+
+    gpiof.moder.modify(|_, w| {w.moder3().alternate()});
+    gpiof.afrl.modify(|_, w| {  w.afrl3().af12()});
+    gpiof.ospeedr.modify(|_, w| w.ospeedr3().very_high_speed());
+
+    gpiof.moder.modify(|_, w| {w.moder4().alternate()});
+    gpiof.afrl.modify(|_, w| {  w.afrl4().af12()});
+    gpiof.ospeedr.modify(|_, w| w.ospeedr4().very_high_speed());
+
+
+    gpiof.moder.modify(|_, w| {w.moder5().alternate()});
+    gpiof.afrl.modify(|_, w| {  w.afrl5().af12()});
+    gpiof.ospeedr.modify(|_, w| w.ospeedr5().very_high_speed());
+
+        
+        // pf.pf12.into_af12(&mut pf.moder, &mut pf.afrh); //FMC_A6
+        // pf.pf13.into_af12(&mut pf.moder, &mut pf.afrh); //FMC_A7
+        // pf.pf14.into_af12(&mut pf.moder, &mut pf.afrh); //FMC_A8
+        // pf.pf15.into_af12(&mut pf.moder, &mut pf.afrh); //FMC_A9
+
+    gpiof.moder.modify(|_, w| {w.moder12().alternate()});
+    gpiof.afrh.modify(|_, w| {  w.afrh12().af12()});
+    gpiof.ospeedr.modify(|_, w| w.ospeedr12().very_high_speed());
+
+
+    gpiof.moder.modify(|_, w| {w.moder13().alternate()});
+    gpiof.afrh.modify(|_, w| {  w.afrh13().af12()});
+    gpiof.ospeedr.modify(|_, w| w.ospeedr13().very_high_speed());
+
+
+    gpiof.moder.modify(|_, w| {w.moder14().alternate()});
+    gpiof.afrh.modify(|_, w| {  w.afrh14().af12()});
+    gpiof.ospeedr.modify(|_, w| w.ospeedr14().very_high_speed());
+
+
+    gpiof.moder.modify(|_, w| {w.moder15().alternate()});
+    gpiof.afrh.modify(|_, w| {  w.afrh15().af12()});
+    gpiof.ospeedr.modify(|_, w| w.ospeedr15().very_high_speed());
+
+  // pg.pg0.into_af12(&mut pg.moder, &mut pg.afrl); //FMC_A10
+    // pg.pg1.into_af12(&mut pg.moder, &mut pg.afrl); //FMC_A11
+    // pg.pg2.into_af12(&mut pg.moder, &mut pg.afrl); //FMC_A12
+    // pg.pg3.into_af12(&mut pg.moder, &mut pg.afrl); //FMC_A13
+    // pg.pg4.into_af12(&mut pg.moder, &mut pg.afrl); //FMC_A14
+
+    gpiog.moder.modify(|_, w| {w.moder0().alternate()});
+    gpiog.afrl.modify(|_, w| {  w.afrl0().af12()});
+    gpiog.ospeedr.modify(|_, w| w.ospeedr0().very_high_speed());
+
+    
+    gpiog.moder.modify(|_, w| {w.moder1().alternate()});
+    gpiog.afrl.modify(|_, w| {  w.afrl1().af12()});
+    gpiog.ospeedr.modify(|_, w| w.ospeedr1().very_high_speed());
+
+    
+    gpiog.moder.modify(|_, w| {w.moder2().alternate()});
+    gpiog.afrl.modify(|_, w| {  w.afrl2().af12()});
+    gpiog.ospeedr.modify(|_, w| w.ospeedr2().very_high_speed());
+
+    
+    gpiog.moder.modify(|_, w| {w.moder3().alternate()});
+    gpiog.afrl.modify(|_, w| {  w.afrl3().af12()});
+    gpiog.ospeedr.modify(|_, w| w.ospeedr3().very_high_speed());
+
+    
+    gpiog.moder.modify(|_, w| {w.moder4().alternate()});
+    gpiog.afrl.modify(|_, w| {  w.afrl4().af12()});
+    gpiog.ospeedr.modify(|_, w| w.ospeedr4().very_high_speed());
+
+    gpiod.moder.modify(|_, w| {w.moder14().alternate()});
+    gpiod.afrh.modify(|_, w| {  w.afrh14().af12()});
+    gpiod.ospeedr.modify(|_, w| w.ospeedr14().very_high_speed());
+
+    gpiod.moder.modify(|_, w| {w.moder15().alternate()});
+    gpiod.afrh.modify(|_, w| {  w.afrh15().af12()});
+    gpiod.ospeedr.modify(|_, w| w.ospeedr15().very_high_speed());
+
+    gpiod.moder.modify(|_, w| {w.moder0().alternate()});
+    gpiod.afrl.modify(|_, w| {  w.afrl0().af12()});
+    gpiod.ospeedr.modify(|_, w| w.ospeedr0().very_high_speed());
+
+
+    gpiod.moder.modify(|_, w| {w.moder1().alternate()});
+    gpiod.afrl.modify(|_, w| {  w.afrl1().af12()});
+    gpiod.ospeedr.modify(|_, w| w.ospeedr1().very_high_speed());
+
+    gpioe.moder.modify(|_, w| {w.moder7().alternate()});
+    gpioe.afrl.modify(|_, w| {  w.afrl7().af12()});
+    gpioe.ospeedr.modify(|_, w| w.ospeedr7().very_high_speed());
+
+    gpioe.moder.modify(|_, w| {w.moder8().alternate()});
+    gpioe.afrh.modify(|_, w| {  w.afrh8().af12()});
+    gpioe.ospeedr.modify(|_, w| w.ospeedr8().very_high_speed());
+
+    gpioe.moder.modify(|_, w| {w.moder9().alternate()});
+    gpioe.afrh.modify(|_, w| {  w.afrh9().af12()});
+    gpioe.ospeedr.modify(|_, w| w.ospeedr9().very_high_speed());
+
+
+    gpioe.moder.modify(|_, w| {w.moder10().alternate()});
+    gpioe.afrh.modify(|_, w| {  w.afrh10().af12()});
+    gpioe.ospeedr.modify(|_, w| w.ospeedr10().very_high_speed());
+
+
+    gpiod.moder.modify(|_, w| {w.moder7().alternate()});
+    gpiod.afrl.modify(|_, w| {  w.afrl7().af12()});
+    gpiod.ospeedr.modify(|_, w| w.ospeedr7().very_high_speed());
+
+
+    gpiod.moder.modify(|_, w| {w.moder4().alternate()});
+    gpiod.afrl.modify(|_, w| {  w.afrl4().af12()});
+    gpiod.ospeedr.modify(|_, w| w.ospeedr4().very_high_speed());
+
+
+    gpiod.moder.modify(|_, w| {w.moder5().alternate()});
+    gpiod.afrl.modify(|_, w| {  w.afrl5().af12()});
+    gpiod.ospeedr.modify(|_, w| w.ospeedr5().very_high_speed());
+
 
    
      // Configure FMC for SRAM memory(in our case F-RAM)
@@ -227,10 +350,13 @@ pub extern "C" fn main() -> ! {
     initialization();
     unsafe{rnd_array[4] = 1;}
     update();
-    if unsafe{execution_mode}{
-        checkpoint(false);
-    }
-  
+    hprintln!("resting the counter ");
+    //unsafe{ptr::write(counter as *mut u8 ,0);}
+    
+    // if unsafe{execution_mode}{
+    //     checkpoint(false);
+    // }
+    
     // exit QEMU
     // NOTE do not run this on hardware; it can corrupt OpenOCD state
     //debug::exit(debug::EXIT_SUCCESS);
