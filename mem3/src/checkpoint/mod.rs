@@ -15,7 +15,7 @@ use volatile::Volatile;
 
 pub static mut transcation_log: u32 = 0x60004000; 
 pub static mut execution_mode: bool = true;  //1. true is jit 2.flase is static 
-pub static mut counter: u32= 0x60003002;
+pub static mut counter: *mut u8= 0x60003002 as *mut u8;
 
 
 
@@ -39,13 +39,14 @@ pub fn save_variables<T>(mem_loc: *const T, size: usize) {
             ptr::write( (transcation_log+2*i as u32) as *mut u8 , byte);   
         }
         transcation_log =  transcation_log + 2*size as u32;
+        *counter +=1;
 
-        let mut a = ptr::read(counter as *const u8);
-        hprintln!("the read value before logging {}",a );
-        a = a + 1;
-        ptr::write(counter as *mut u8, a);
-        let b = ptr::read(counter as *const u8 );
-        hprintln!("After logging counter is {}", b);
+        // let mut a = ptr::read(counter as *const u8);
+        // hprintln!("the read value before logging {}",a );
+        // a = a + 1;
+        // ptr::write(counter as *mut u8, a);
+        // let b = ptr::read(counter as *const u8 );
+        // hprintln!("After logging counter is {}", b);
     }
     hprintln!("Address: {:p}, Size: {} bytes", mem_loc, size);
 }
@@ -384,7 +385,7 @@ pub fn restore_globals(){
     unsafe{
         let mut restore_ctr:u8 = 0;
         loop {
-            if ptr::read(counter as *mut u8)== restore_ctr {
+            if *counter == restore_ctr {
                 break;
             }
 
@@ -441,7 +442,8 @@ pub fn restore()->bool{
 
         if  ptr::read_volatile(flash_start_address as *const u32) == 0xDEAD_BEEF{
             restore_globals();
-            ptr::write(counter as *mut u8,0);
+            //ptr::write(counter as *mut u8,0);
+            *counter = 0;
         }
 
         // let mut end_address = 0x0801_0004 + packet_size;
