@@ -18,19 +18,19 @@ use cortex_m::peripheral::NVIC;
 
 mod checkpoint;
 use checkpoint::{checkpoint, restore, delete_pg, delete_all_pg, transcation_log, execution_mode, counter,start_atomic, end_atomic};
-use instrument::my_proc_macro;
+// use instrument::my_proc_macro;
 
-#[link_section = ".fram_section"]
-static mut x:u16 = 1;
-#[link_section = ".fram_section"]
-static mut y:u16 = 3;
-#[link_section = ".fram_section"]
-static mut z:u16 = 2;
-#[link_section = ".fram_section"]
-static mut t:u16 = 5; //change to assign a random number
+// #[link_section = ".fram_section"]
+// static mut x:u16 = 1;
+// #[link_section = ".fram_section"]
+// static mut y:u16 = 3;
+// #[link_section = ".fram_section"]
+// static mut z:u16 = 2;
+// #[link_section = ".fram_section"]
+// static mut t:u16 = 0xFF; //change to assign a random number
 
-#[link_section = ".fram_section"]
-static mut rnd_array:[u16;5] = [10,12,14,15,2];
+// #[link_section = ".fram_section"]
+// static mut rnd_array:[u16;5] = [10,12,14,15,2];
 
 // fn test_checkpoint(){
 //     unsafe {
@@ -334,24 +334,25 @@ unsafe{
 
 }
 
-#[my_proc_macro]
-fn update(){
-    let mut ya:u8 = 2;
-    start_atomic();
-    //unsafe{save_variables(addr_of!(x), 4);}
-    unsafe{x = 5;}
-    ya = ya + 2;
-    end_atomic();
-}
+// #[my_proc_macro]
+// fn update(){
+//     let mut ya:u8 = 2;
+//     start_atomic();
+//     //unsafe{save_variables(addr_of!(x), 4);}
+//     unsafe{x = 5;}
+//     ya = ya + 2;
+//     end_atomic();
+// }
 
 #[no_mangle]
 pub extern "C" fn main() -> ! {
     //delete_pg(0x0803_0000 as u32);  //0x0807_F800
     initialization();
-    unsafe{rnd_array[4] = 1;}
-    update();
-    hprintln!("resting the counter ");
+    // unsafe{rnd_array[4] = 1;}
+    //update();
+    hprintln!("reseting the counter ");
     //unsafe{ptr::write(counter as *mut u8 ,0);}
+    
     
     // if unsafe{execution_mode}{
     //     checkpoint(false);
@@ -360,6 +361,18 @@ pub extern "C" fn main() -> ! {
     // exit QEMU
     // NOTE do not run this on hardware; it can corrupt OpenOCD state
     //debug::exit(debug::EXIT_SUCCESS);
+
+    let mut ans = [0;60];
+    unsafe{
+        for i in 0..=60{
+            ptr::write_volatile((0x6000_0000 + (2*i)) as *mut u8, (100+i) as u8); 
+
+            ans[i] = unsafe { ptr::read_volatile((0x6000_0000 + (2*i)) as *mut u8) };
+            hprintln!("Value at index {}: {}", i, ans[i]).unwrap();
+        }
+        hprintln!("Value at index {:?}", ans).unwrap();
+    
+      }
 
    loop {}
 }
