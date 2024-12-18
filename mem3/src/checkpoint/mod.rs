@@ -14,10 +14,332 @@ use stm32f3xx_hal_v2::{pac::Peripherals, pac::FLASH};
 use volatile::Volatile;
 
 pub static mut transcation_log: u32 = 0x60004000; 
-pub static mut execution_mode: bool = true;  //1. true is jit 2.flase is static 
+pub static mut execution_mode: bool = true;  //1. true is jit 2.false is static 
 pub static mut counter: *mut u8= 0x60003002 as *mut u8;
 
+pub fn initialization(){
+   let dp  = Peripherals::take().unwrap();
+   
+    //enable HSI
+   dp.RCC.cr.write(|w| w.hsion().set_bit());
+   while dp.RCC.cr.read().hsirdy().bit_is_clear() {}
 
+    //configure PLL
+    // Step 1: Disable the PLL by setting PLLON to 0
+    dp.RCC.cr.modify(|_r, w| w.pllon().clear_bit());
+
+    // Step 2: Wait until PLLRDY is cleared
+    while dp.RCC.cr.read().pllrdy().bit_is_set() {}
+
+    // Step 3: Change the desired parameter
+    // For example, modify PLL multiplier (PLLMUL)
+
+    dp.RCC.cfgr.modify(|_, w| w.pllsrc().hsi_div_prediv());
+
+    // Set PLL Prediv to /1
+    dp.RCC.cfgr2.modify(|_, w| w.prediv().div1());
+
+    // Set PLL MUL to x9
+    dp.RCC.cfgr.modify(|_, w| w.pllmul().mul2());  //changed from x9 to x2
+
+    // Step 4: Enable the PLL again by setting PLLON to 1
+   // dp.RCC.cr.modify(|_r, w| w.pllon().set_bit());
+
+    dp.RCC.cr.modify(|_, w| w.pllon().on());
+
+    while dp.RCC.cr.read().pllrdy().bit_is_clear(){}
+
+       // Configure prescalar values for HCLK, PCLK1, and PCLK2
+   dp.RCC.cfgr.modify(|_, w| {
+        w.hpre().div1() // HCLK prescaler: no division
+        .ppre1().div2() // PCLK1 prescaler: divide by 2
+        .ppre2().div1() // PCLK2 prescaler: no division
+    });
+
+
+    // Enable FLASH Prefetch Buffer and set Flash Latency (required for high speed)
+    // was crashing just because this was missing
+    dp.FLASH.acr
+        .modify(|_, w| w.prftbe().enabled().latency().ws1());
+
+     // Select PLL as system clock source
+     dp.RCC.cfgr.modify(|_, w| w.sw().pll());
+
+     while dp.RCC.cfgr.read().sw().bits() != 0b10 {}
+
+      // Wait for system clock to stabilize
+      while dp.RCC.cfgr.read().sws().bits() != 0b10 {}
+
+   //   dp.RCC.ahbenr.modify(|_, w| w.iopden().set_bit());
+   //   dp.RCC.ahbenr.modify(|_, w| w.iopeen().set_bit());
+   //   dp.RCC.ahbenr.modify(|_, w| w.iopfen().set_bit());
+   //   dp.RCC.ahbenr.modify(|_, w| w.iopgen().set_bit());
+   //   dp.RCC.ahbenr.modify(|_, w| w.iophen().set_bit());  
+   //   dp.RCC.ahbenr.modify(|_, w| w.sramen().set_bit());  
+   //   dp.RCC.ahbenr.modify(|_, w| w.flitfen().set_bit());  
+   //   dp.RCC.ahbenr.modify(|_, w| w.fmcen().set_bit());  
+
+   dp.RCC.ahbenr.modify(|_, w| w.iopcen().set_bit());
+
+   dp.RCC.ahbenr.modify(|_, w| w.iopden().set_bit());
+   dp.RCC.ahbenr.modify(|_, w| w.iopeen().set_bit());
+   dp.RCC.ahbenr.modify(|_, w| w.iopfen().set_bit());
+   dp.RCC.ahbenr.modify(|_, w| w.iopgen().set_bit());
+   dp.RCC.ahbenr.modify(|_, w| w.iophen().set_bit());  
+   dp.RCC.ahbenr.modify(|_, w| w.sramen().set_bit());  
+   dp.RCC.ahbenr.modify(|_, w| w.flitfen().set_bit());  
+   dp.RCC.ahbenr.modify(|_, w| w.fmcen().set_bit());  
+
+
+   dp.RCC.apb2enr.modify(|_, w| w.syscfgen().set_bit());
+   dp.RCC.apb1enr.modify(|_, w| w.pwren().set_bit());
+
+ let  gpiod = dp.GPIOD;
+ let  gpioe = dp.GPIOE;
+ let  gpiof = dp.GPIOF;
+ let  gpiog = dp.GPIOG;
+ let  gpioh = dp.GPIOH;
+
+ dp.GPIOC.moder.write(|w| unsafe { w.moder10().bits(0b01) });
+ dp.GPIOC.moder.write(|w| unsafe { w.moder11().bits(0b01) });
+ dp.GPIOC.odr.write(|w| w.odr10().set_bit());
+ dp.GPIOA.odr.write(|w| w.odr11().set_bit());
+
+//  dp.GPIOC.moder.modify(|_, w| w.moder11().bits(0b01)); // Set MODER11[1:0] = 01
+//  dp.GPIOC.bsrr.write(|w| w.bs11().set_bit());
+
+
+//  dp.GPIOC.moder.modify(|_, w| w.moder10().bits(0b01)); // Set MODER10[1:0] = 01
+//  dp.GPIOC.bsrr.write(|w| w.bs10().set_bit());
+
+ //    PH0   ------> FMC_A0
+   gpioh.moder.modify(|_, w| {w.moder0().alternate()});
+   gpioh.afrl.modify(|_, w| {  w.afrl0().af12()});
+   gpioh.ospeedr.modify(|_, w| w.ospeedr0().very_high_speed());
+
+// PH1   ------> FMC_A1
+   gpioh.moder.modify(|_, w| {w.moder1().alternate()});
+   gpioh.afrl.modify(|_, w| {  w.afrl1().af12()});
+   gpioh.ospeedr.modify(|_, w| w.ospeedr1().very_high_speed());
+
+//  PF2   ------> FMC_A2
+   gpiof.moder.modify(|_, w| {w.moder2().alternate()});
+   gpiof.afrl.modify(|_, w| {  w.afrl2().af12()});
+   gpiof.ospeedr.modify(|_, w| w.ospeedr2().very_high_speed());
+
+//   PF3   ------> FMC_A3
+   gpiof.moder.modify(|_, w| {w.moder3().alternate()});
+   gpiof.afrl.modify(|_, w| {  w.afrl3().af12()});
+   gpiof.ospeedr.modify(|_, w| w.ospeedr3().very_high_speed());
+
+   //   PF4   ------> FMC_A4
+   gpiof.moder.modify(|_, w| {w.moder4().alternate()});
+   gpiof.afrl.modify(|_, w| {  w.afrl4().af12()});
+   gpiof.ospeedr.modify(|_, w| w.ospeedr4().very_high_speed());
+
+// PF5   ------> FMC_A5
+   gpiof.moder.modify(|_, w| {w.moder5().alternate()});
+   gpiof.afrl.modify(|_, w| {  w.afrl5().af12()});
+   gpiof.ospeedr.modify(|_, w| w.ospeedr5().very_high_speed());
+
+
+   //    PF12   ------> FMC_A6
+   gpiof.moder.modify(|_, w| {w.moder12().alternate()});
+   gpiof.afrh.modify(|_, w| {  w.afrh12().af12()});
+   gpiof.ospeedr.modify(|_, w| w.ospeedr12().very_high_speed());
+
+//   PF13   ------> FMC_A7
+   gpiof.moder.modify(|_, w| {w.moder13().alternate()});
+   gpiof.afrh.modify(|_, w| {  w.afrh13().af12()});
+   gpiof.ospeedr.modify(|_, w| w.ospeedr13().very_high_speed());
+
+//   PF14   ------> FMC_A8
+   gpiof.moder.modify(|_, w| {w.moder14().alternate()});
+   gpiof.afrh.modify(|_, w| {  w.afrh14().af12()});
+   gpiof.ospeedr.modify(|_, w| w.ospeedr14().very_high_speed());
+
+   //PF15   ------> FMC_A9
+   gpiof.moder.modify(|_, w| {w.moder15().alternate()});
+   gpiof.afrh.modify(|_, w| {  w.afrh15().af12()});
+   gpiof.ospeedr.modify(|_, w| w.ospeedr15().very_high_speed());
+
+   // PG0   ------> FMC_A10
+   gpiog.moder.modify(|_, w| {w.moder0().alternate()});
+   gpiog.afrl.modify(|_, w| {  w.afrl0().af12()});
+   gpiog.ospeedr.modify(|_, w| w.ospeedr0().very_high_speed());
+
+   //  PG1   ------> FMC_A11
+   gpiog.moder.modify(|_, w| {w.moder1().alternate()});
+   gpiog.afrl.modify(|_, w| {  w.afrl1().af12()});
+   gpiog.ospeedr.modify(|_, w| w.ospeedr1().very_high_speed());
+
+   //  PG2   ------> FMC_A12
+   gpiog.moder.modify(|_, w| {w.moder2().alternate()});
+   gpiog.afrl.modify(|_, w| {  w.afrl2().af12()});
+   gpiog.ospeedr.modify(|_, w| w.ospeedr2().very_high_speed());
+
+   //    PG3   ------> FMC_A13
+   gpiog.moder.modify(|_, w| {w.moder3().alternate()});
+   gpiog.afrl.modify(|_, w| {  w.afrl3().af12()});
+   gpiog.ospeedr.modify(|_, w| w.ospeedr3().very_high_speed());
+
+   //   PG4   ------> FMC_A14
+   gpiog.moder.modify(|_, w| {w.moder4().alternate()});
+   gpiog.afrl.modify(|_, w| {  w.afrl4().af12()});
+   gpiog.ospeedr.modify(|_, w| w.ospeedr4().very_high_speed());
+
+   
+    //PG5   ------> FMC_A15
+    gpiog.moder.modify(|_, w| {w.moder5().alternate()});
+    gpiog.afrl.modify(|_, w| {  w.afrl5().af12()});
+    gpiog.ospeedr.modify(|_, w| w.ospeedr5().very_high_speed());
+
+
+    //  PD14   ------> FMC_D0
+   gpiod.moder.modify(|_, w| {w.moder14().alternate()});
+   gpiod.afrh.modify(|_, w| {  w.afrh14().af12()});
+   gpiod.ospeedr.modify(|_, w| w.ospeedr14().very_high_speed());
+
+   //  PD15   ------> FMC_D1
+   gpiod.moder.modify(|_, w| {w.moder15().alternate()});
+   gpiod.afrh.modify(|_, w| {  w.afrh15().af12()});
+   gpiod.ospeedr.modify(|_, w| w.ospeedr15().very_high_speed());
+
+   // PD0   ------> FMC_D2
+   gpiod.moder.modify(|_, w| {w.moder0().alternate()});
+   gpiod.afrl.modify(|_, w| {  w.afrl0().af12()});
+   gpiod.ospeedr.modify(|_, w| w.ospeedr0().very_high_speed());
+
+   // PD1   ------> FMC_D3
+   gpiod.moder.modify(|_, w| {w.moder1().alternate()});
+   gpiod.afrl.modify(|_, w| {  w.afrl1().af12()});
+   gpiod.ospeedr.modify(|_, w| w.ospeedr1().very_high_speed());
+
+   //PE7   ------> FMC_D4
+   gpioe.moder.modify(|_, w| {w.moder7().alternate()});
+   gpioe.afrl.modify(|_, w| {  w.afrl7().af12()});
+   gpioe.ospeedr.modify(|_, w| w.ospeedr7().very_high_speed());
+
+   //PE8   ------> FMC_D5
+   gpioe.moder.modify(|_, w| {w.moder8().alternate()});
+   gpioe.afrh.modify(|_, w| {  w.afrh8().af12()});
+   gpioe.ospeedr.modify(|_, w| w.ospeedr8().very_high_speed());
+
+   // PE9   ------> FMC_D6
+   gpioe.moder.modify(|_, w| {w.moder9().alternate()});
+   gpioe.afrh.modify(|_, w| {  w.afrh9().af12()});
+   gpioe.ospeedr.modify(|_, w| w.ospeedr9().very_high_speed());
+
+   //PE10   ------> FMC_D7
+   gpioe.moder.modify(|_, w| {w.moder10().alternate()});
+   gpioe.afrh.modify(|_, w| {  w.afrh10().af12()});
+   gpioe.ospeedr.modify(|_, w| w.ospeedr10().very_high_speed());
+
+   //PE11   ------> FMC_D8
+   gpioe.moder.modify(|_, w| {w.moder11().alternate()});
+   gpioe.afrh.modify(|_, w| {  w.afrh11().af12()});
+   gpioe.ospeedr.modify(|_, w| w.ospeedr11().very_high_speed());
+
+
+   //PE12   ------> FMC_D9
+   gpioe.moder.modify(|_, w| {w.moder12().alternate()});
+   gpioe.afrh.modify(|_, w| {  w.afrh12().af12()});
+   gpioe.ospeedr.modify(|_, w| w.ospeedr12().very_high_speed());
+
+   //PE13   ------> FMC_D10
+   gpioe.moder.modify(|_, w| {w.moder13().alternate()});
+   gpioe.afrh.modify(|_, w| {  w.afrh13().af12()});
+   gpioe.ospeedr.modify(|_, w| w.ospeedr13().very_high_speed());
+
+   //PE14   ------> FMC_D11
+   gpioe.moder.modify(|_, w| {w.moder14().alternate()});
+   gpioe.afrh.modify(|_, w| {  w.afrh14().af12()});
+   gpioe.ospeedr.modify(|_, w| w.ospeedr14().very_high_speed());
+
+   //PE15   ------> FMC_D12
+   gpioe.moder.modify(|_, w| {w.moder15().alternate()});
+   gpioe.afrh.modify(|_, w| {  w.afrh15().af12()});
+   gpioe.ospeedr.modify(|_, w| w.ospeedr15().very_high_speed());
+
+   //PD8   ------> FMC_D13
+   gpiod.moder.modify(|_, w| {w.moder8().alternate()});
+   gpiod.afrh.modify(|_, w| {  w.afrh8().af12()});
+   gpiod.ospeedr.modify(|_, w| w.ospeedr8().very_high_speed());
+
+   //PD9   ------> FMC_D14
+   gpiod.moder.modify(|_, w| {w.moder9().alternate()});
+   gpiod.afrh.modify(|_, w| {  w.afrh9().af12()});
+   gpiod.ospeedr.modify(|_, w| w.ospeedr9().very_high_speed());
+
+   //PD10   ------> FMC_D15
+   gpiod.moder.modify(|_, w| {w.moder10().alternate()});
+   gpiod.afrh.modify(|_, w| {  w.afrh10().af12()});
+   gpiod.ospeedr.modify(|_, w| w.ospeedr10().very_high_speed());
+
+
+   // PD4   ------> FMC_NOE
+   // PD5   ------> FMC_NWE
+   // PD7   ------> FMC_NE1
+
+   gpiod.moder.modify(|_, w| {w.moder7().alternate()});
+   gpiod.afrl.modify(|_, w| {  w.afrl7().af12()});
+   gpiod.ospeedr.modify(|_, w| w.ospeedr7().very_high_speed());
+
+
+   gpiod.moder.modify(|_, w| {w.moder4().alternate()});
+   gpiod.afrl.modify(|_, w| {  w.afrl4().af12()});
+   gpiod.ospeedr.modify(|_, w| w.ospeedr4().very_high_speed());
+
+
+   gpiod.moder.modify(|_, w| {w.moder5().alternate()});
+   gpiod.afrl.modify(|_, w| {  w.afrl5().af12()});
+   gpiod.ospeedr.modify(|_, w| w.ospeedr5().very_high_speed());
+
+
+  
+    // Configure FMC for SRAM memory(in our case F-RAM)
+      unsafe{
+          dp.FMC.bcr1.modify(|_, w| {
+          w.mbken().set_bit(); // Enable FRAM bank 1
+          w.mtyp().bits(0b00); // FRAM memory type
+          w.mwid().bits(0b01); // 16-bit width
+          w.bursten().clear_bit(); //disable brust access mode
+          w.wren().clear_bit(); // wrap disable
+          w.muxen().clear_bit(); // Non-multiplexed
+          w.extmod().clear_bit(); // extended mode
+          w.asyncwait().clear_bit(); //disable async wait
+          w
+       });
+  
+       /*
+          Timing.AddressSetupTime = 1;
+          Timing.AddressHoldTime = 1;
+          Timing.DataSetupTime = 5;
+          Timing.BusTurnAroundDuration = 0;
+          Timing.CLKDivision = 0;
+          Timing.DataLatency = 0;
+          Timing.AccessMode = FMC_ACCESS_MODE_A;
+     */
+       dp.FMC.btr1.modify(|_,w|  {
+         // Set address setup time to 1 cycle
+          w.addset().bits(0x1);
+          // Set data setup time to 5 cycle
+          w.datast().bits(0x5);
+          // address hold time
+          w.addhld().bits(0x1);
+          // bus turn around
+          w.busturn().bits(0x0);
+          // clock division
+          w.clkdiv().bits(0x4);
+          //data latency
+          w.datlat().bits(0x0);
+          //access mode
+          w.accmod().bits(0x0);
+  
+          w
+      });
+  }
+}
 
 pub fn save_variables<T>(mem_loc: *const T, size: usize) {
     unsafe{
@@ -274,8 +596,8 @@ pub fn checkpoint(c_type:bool){
 
          let stack_size = (start_address - end_address) + 4;
         // leaving first xyz K for program i.e start at 0x0801_0000
-         let mut flash_start_address = Volatile::new(0x0803_0000);
-         let mut flash_end_address = Volatile::new(0x0807_FFFF);    
+         let mut fram_start_address = Volatile::new(0x6003_0000);
+         let mut fram_end_address = Volatile::new(0x6007_FFFF);    
 
         let mut checkpoint_size= Volatile::new(0u32);
         asm::dmb();
@@ -288,53 +610,53 @@ pub fn checkpoint(c_type:bool){
         asm::dmb();
 
         loop{
-            let mut offset = ptr::read_volatile(flash_start_address.read() as *const u32);
+            let mut offset = ptr::read_volatile(fram_start_address.read() as *const u32);
             if offset == 0xffff_ffff{
                 break;
             }
-            flash_start_address.write(flash_start_address.read() + offset); 
-            if flash_start_address.read() + checkpoint_size.read() >= flash_end_address.read() {
+            fram_start_address.write(fram_start_address.read() + offset); 
+            if fram_start_address.read() + checkpoint_size.read() >= fram_end_address.read() {
                erase_all(&mut flash);
-               flash_start_address = Volatile::new(0x0803_0000);
+               fram_start_address = Volatile::new(0x0803_0000);
                break;
             }
         }
         asm::dmb();
         //write the size of packet at the begining of the packet
-        write_to_flash(&mut flash,  (flash_start_address.read()) as u32, checkpoint_size.read() as u32); 
-        flash_start_address.write(flash_start_address.read()+4);
+         ptr::write_volatile(  (fram_start_address.read()) as *mut u32, checkpoint_size.read() as u32); 
+        fram_start_address.write(fram_start_address.read()+4);
         asm::dmb();
            // Code that involves Flash write
     //      if offset == 0xffff_ffff {
     //   // stack_size + 4(0xffff_ffff to signal end of stack) + 16*4(store registers) + 4 (size of a packet)
-    //         write_to_flash(&mut flash,  flash_start_address as u32, checkpoint_size+1-1  as u32);
-    //         flash_start_address = flash_start_address + 4;
+    //          ptr::write_volatile(  fram_start_address as u32, checkpoint_size+1-1  as u32);
+    //         fram_start_address = fram_start_address + 4;
     //      }
     //      else{
-    //         flash_start_address = flash_start_address + offset; 
-    //         let flash_end_address = 0x0807_FFFF-1+1;
-    //         if flash_end_address - flash_start_address < checkpoint_size {
+    //         fram_start_address = fram_start_address + offset; 
+    //         let fram_end_address = 0x0807_FFFF-1+1;
+    //         if fram_end_address - fram_start_address < checkpoint_size {
     //             //clear flash
     //             //set start address and offset
     //             erase_all(&mut flash);
-    //             flash_start_address = 0x0801_0004;
+    //             fram_start_address = 0x0801_0004;
     //             offset = 0;
     //         }
-    //         write_to_flash(&mut flash,  0x0801_0000 as u32, offset+checkpoint_size+1-1  as u32);
+    //          ptr::write_volatile(  0x0801_0000 as u32, offset+checkpoint_size+1-1  as u32);
     //      }
     asm::dmb(); 
         if c_type {
             //write at the begining of checkpoint fram so magic number indicate jit or static checkpoint
-            write_to_flash(&mut flash,  flash_start_address.read() as u32, 0xDEADBEEF as u32);
+             ptr::write_volatile(  fram_start_address.read() as *mut u32, 0xDEADBEEF as u32);
         }
         else{
-            write_to_flash(&mut flash,  flash_start_address.read() as u32,  0x0000_0001 as u32);
+             ptr::write_volatile(  fram_start_address.read() as *mut u32,  0x0000_0001 as u32);
         }
          while start_address >= end_address{
             let mut data = Volatile::new(0u32);
             data.write(core::ptr::read_volatile(start_address as * const u32));
-            write_to_flash(&mut flash,  flash_start_address.read() as u32, data.read() as u32);
-            flash_start_address.write(flash_start_address.read() +1* 4);
+             ptr::write_volatile(  fram_start_address.read() as *mut u32, data.read() as u32);
+            fram_start_address.write(fram_start_address.read() +1* 4);
             // Move to the next address based on the size of the type
             start_address = start_address-4;
             
@@ -342,32 +664,32 @@ pub fn checkpoint(c_type:bool){
         asm::dmb();
     asm::dmb();
     //mark the end of the stack
-    write_to_flash(&mut flash,  (flash_start_address.read()) as u32, 0xf1f1_f1f1 as u32);
-    flash_start_address.write(flash_start_address.read() + 4);
+     ptr::write_volatile(  (fram_start_address.read()) as *mut u32, 0xf1f1_f1f1 as u32);
+    fram_start_address.write(fram_start_address.read() + 4);
     asm::dmb();
 
     // for i in 0..15{
-    //     write_to_flash(&mut flash,  0x0800_9060 as u32, r0_value as u32);
-    //       flash_start_address = flash_start_address + 4;
+    //      ptr::write_volatile(  0x0800_9060 as u32, r0_value as u32);
+    //       fram_start_address = fram_start_address + 4;
     // }
 
-    write_to_flash(&mut flash,  flash_start_address.read() as u32, r0_value as u32);
-    write_to_flash(&mut flash,  flash_start_address.read()+4 as u32, r1_value as u32);
-    write_to_flash(&mut flash,  flash_start_address.read()+8 as u32, r2_value as u32);
-    write_to_flash(&mut flash,  flash_start_address.read()+12 as u32, r3_value as u32);
-    write_to_flash(&mut flash,  flash_start_address.read()+16 as u32, r4_value as u32);
-    write_to_flash(&mut flash,  flash_start_address.read()+20 as u32, r5_value as u32);
-    write_to_flash(&mut flash,  flash_start_address.read()+24 as u32, r6_value as u32);
-    write_to_flash(&mut flash,  flash_start_address.read()+28 as u32, r7_value as u32);
-    write_to_flash(&mut flash,  flash_start_address.read()+32 as u32, r8_value as u32);
-    write_to_flash(&mut flash,  flash_start_address.read()+36 as u32, r9_value as u32);
-    write_to_flash(&mut flash,  flash_start_address.read()+40 as u32, r10_value as u32);
-    write_to_flash(&mut flash,  flash_start_address.read()+44 as u32, r11_value as u32);
-    write_to_flash(&mut flash,  flash_start_address.read()+48 as u32, r12_value as u32);
-    write_to_flash(&mut flash,  flash_start_address.read()+52 as u32, r13_sp as u32);
-    write_to_flash(&mut flash,  flash_start_address.read()+56 as u32, r14_lr as u32);
-    write_to_flash(&mut flash,  flash_start_address.read()+60 as u32, r15_pc as u32);
-    drop(flash);
+     ptr::write_volatile(  fram_start_address.read() as *mut  u32, r0_value as u32);
+     ptr::write_volatile(  (fram_start_address.read()+4) as  *mut u32, r1_value as u32);
+     ptr::write_volatile( (fram_start_address.read()+8) as *mut u32, r2_value as u32);
+     ptr::write_volatile( (fram_start_address.read()+12) as *mut u32, r3_value as u32);
+     ptr::write_volatile( (fram_start_address.read()+16)  as *mut u32, r4_value as u32);
+     ptr::write_volatile( (fram_start_address.read()+20) as *mut u32, r5_value as u32);
+     ptr::write_volatile( (fram_start_address.read()+24) as *mut u32, r6_value as u32);
+     ptr::write_volatile( (fram_start_address.read()+28) as *mut u32, r7_value as u32);
+     ptr::write_volatile( (fram_start_address.read()+32) as *mut u32, r8_value as u32);
+     ptr::write_volatile( (fram_start_address.read()+36) as *mut u32, r9_value as u32);
+     ptr::write_volatile( (fram_start_address.read()+40) as *mut u32, r10_value as u32);
+     ptr::write_volatile( (fram_start_address.read()+44) as *mut u32, r11_value as u32);
+     ptr::write_volatile( (fram_start_address.read()+48) as *mut u32, r12_value as u32);
+     ptr::write_volatile( (fram_start_address.read()+52) as *mut u32, r13_sp as u32);
+     ptr::write_volatile( (fram_start_address.read()+56) as *mut u32, r14_lr as u32);
+     ptr::write_volatile( (fram_start_address.read()+60) as *mut  u32, r15_pc as u32);
+   
     }     
 }
 
@@ -414,13 +736,13 @@ pub fn restore_globals(){
 }
 pub fn restore()->bool{
     unsafe {
-        let mut flash_start_address = 0x0803_0000;
+        let mut fram_start_address = 0x0803_0000;
         let packet_size = ptr::read_volatile(0x0803_0000 as *const u32);
         //let r0_flash = ptr::read_volatile(0x0800_9060 as *const u32);
         if packet_size == 0xffff_ffff {
             return false
         }
-        if  ptr::read_volatile((flash_start_address + packet_size) as *const u32)==0xffff_ffff{
+        if  ptr::read_volatile((fram_start_address + packet_size) as *const u32)==0xffff_ffff{
             return  false;
         }
 
@@ -430,17 +752,17 @@ pub fn restore()->bool{
         //2. The last checkpoint could be a failed(incomplete) checkpoint.
         loop{
             
-            offset = ptr::read_volatile(flash_start_address  as *const u32);
+            offset = ptr::read_volatile(fram_start_address  as *const u32);
   
-            if  ptr::read_volatile((flash_start_address + offset) as *const u32) == 0xffff_ffff{
+            if  ptr::read_volatile((fram_start_address + offset) as *const u32) == 0xffff_ffff{
                 break;
             }
     
-            flash_start_address+=offset;
+            fram_start_address+=offset;
         }
-        flash_start_address+=4;
+        fram_start_address+=4;
 
-        if  ptr::read_volatile(flash_start_address as *const u32) == 0xDEAD_BEEF{
+        if  ptr::read_volatile(fram_start_address as *const u32) == 0xDEAD_BEEF{
             restore_globals();
             //ptr::write(counter as *mut u8,0);
             *counter = 0;
@@ -450,11 +772,11 @@ pub fn restore()->bool{
         // let recent_frame_size: u32 = ptr::read_volatile(end_address as *const u32);
         // let mut recent_frame_start_address = end_address - recent_frame_size;
 
-        flash_start_address+=4;
+        fram_start_address+=4;
 
         asm!(
             "mov r0, {0}",
-            in(reg) flash_start_address
+            in(reg) fram_start_address
         );
 
         //set sp to 0x0200_fffc

@@ -1,3 +1,0 @@
-cargo:rustc-link-search=/Users/kb/Documents/intermittentC/redpanda/mem3/target/thumbv7em-none-eabihf/debug/build/stm32f3-dd13dc40a4734ea6/out
-cargo:rerun-if-changed=src/stm32f303/device.x
-cargo:rerun-if-changed=build.rs
