@@ -14,8 +14,10 @@ use stm32f3xx_hal_v2::{pac::Peripherals, pac::FLASH};
 use volatile::Volatile;
 
 pub static mut transcation_log: u32 = 0x60004000; 
+pub static mut data_loc: u32 = 0x60005000; 
 pub static mut execution_mode: bool = true;  //1. true is jit 2.false is static 
 pub static mut counter: *mut u8= 0x60003002 as *mut u8;
+
 
 pub fn initialization(){
    let dp  = Peripherals::take().unwrap();
@@ -342,6 +344,18 @@ pub fn initialization(){
 }
 
 pub fn save_variables<T>(mem_loc: *const T, size: usize) {
+    unsafe{
+        let mem_loc_u32 = mem_loc as *const u32;
+        ptr::write(transcation_log as *mut u32 , mem_loc as u32);
+        transcation_log += 4;
+        ptr::write(transcation_log as *mut u32 , size as u32);
+        transcation_log += 4;
+        ptr::write( data_loc as *mut u16 , *mem_loc_u32 as u16);
+    }
+
+}
+
+pub fn save_variables1<T>(mem_loc: *const T, size: usize) {
     unsafe{
         let mem_loc_u8 = mem_loc as *const u8;
         for i in 0..4 {
