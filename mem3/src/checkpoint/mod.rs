@@ -351,6 +351,7 @@ pub fn save_variables<T>(mem_loc: *const T, size: usize) {
         ptr::write(transcation_log as *mut u32 , size as u32);
         transcation_log += 4;
         ptr::write( data_loc as *mut u16 , *mem_loc_u32 as u16);
+        *counter = *counter + 1;
     }
 
 }
@@ -725,6 +726,23 @@ pub fn restore_globals(){
                 break;
             }
 
+           ptr::write(transcation_log as *mut u32, transcation_log + 8);
+           transcation_log += 12;
+
+           restore_ctr = restore_ctr + 1; 
+        }
+
+    }
+}   
+
+pub fn restore_globals1(){
+    unsafe{
+        let mut restore_ctr:u8 = 0;
+        loop {
+            if *counter == restore_ctr {
+                break;
+            }
+
             let mut combined:u32 = 0;
             for i in 0..4 {
                 combined |= (ptr::read((transcation_log + i) as *const u32) << (i * 8));
@@ -738,7 +756,7 @@ pub fn restore_globals(){
             }
             combined =  combined + size as u32;
 
-            let end = ptr::read(combined as *const u8);
+            //let end = ptr::read(combined as *const u8);
             restore_ctr += 1;
 
   
