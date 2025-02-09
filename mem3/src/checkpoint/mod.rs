@@ -16,7 +16,7 @@ use volatile::Volatile;
 pub static mut transcation_log: u32 = 0x60004000; 
 pub static mut data_loc: u32 = 0x60005000; 
 pub static mut execution_mode: bool = true;  //1. true is jit 2.false is static 
-pub static mut counter: *mut u8= 0x60003002 as *mut u8;
+pub static mut counter: *mut u16= 0x60003000 as *mut u16;
 
 
 pub fn initialization(){
@@ -345,12 +345,13 @@ pub fn initialization(){
 
 pub fn save_variables<T>(mem_loc: *const T, size: usize) {
     unsafe{
-        let mem_loc_u32 = mem_loc as *const u32;
+        hprintln!("mem loc {:?}", mem_loc);
         ptr::write(transcation_log as *mut u32 , mem_loc as u32);
         transcation_log += 4;
         ptr::write(transcation_log as *mut u32 , size as u32);
         transcation_log += 4;
-        ptr::write( data_loc as *mut u16 , *mem_loc_u32 as u16);
+        ptr::write( data_loc as *mut u16 , (mem_loc as * const u16) as u16);
+        data_loc+= 2;
         *counter = *counter + 1;
     }
 
@@ -592,10 +593,10 @@ pub fn checkpoint(c_type:bool){
     }
     unsafe{
 
-        let  dp = Peripherals::steal();
-        let mut flash= dp.FLASH;
-        unlock(&mut flash);
-        wait_ready(&flash);
+        // let  dp = Peripherals::steal();
+        // let mut flash= dp.FLASH;
+        // unlock(&mut flash);
+        // wait_ready(&flash);
 
    
         //let  start_address: u32 = 0x2000_fffc as u32;
@@ -631,7 +632,7 @@ pub fn checkpoint(c_type:bool){
             }
             fram_start_address.write(fram_start_address.read() + offset); 
             if fram_start_address.read() + checkpoint_size.read() >= fram_end_address.read() {
-               erase_all(&mut flash);
+               //erase_all(&mut flash);
                fram_start_address = Volatile::new(0x0803_0000);
                break;
             }
@@ -640,26 +641,6 @@ pub fn checkpoint(c_type:bool){
         //write the size of packet at the begining of the packet
          ptr::write_volatile(  (fram_start_address.read()) as *mut u32, checkpoint_size.read() as u32); 
         fram_start_address.write(fram_start_address.read()+4);
-        asm::dmb();
-           // Code that involves Flash write
-    //      if offset == 0xffff_ffff {
-    //   // stack_size + 4(0xffff_ffff to signal end of stack) + 16*4(store registers) + 4 (size of a packet)
-    //          ptr::write_volatile(  fram_start_address as u32, checkpoint_size+1-1  as u32);
-    //         fram_start_address = fram_start_address + 4;
-    //      }
-    //      else{
-    //         fram_start_address = fram_start_address + offset; 
-    //         let fram_end_address = 0x0807_FFFF-1+1;
-    //         if fram_end_address - fram_start_address < checkpoint_size {
-    //             //clear flash
-    //             //set start address and offset
-    //             erase_all(&mut flash);
-    //             fram_start_address = 0x0801_0004;
-    //             offset = 0;
-    //         }
-    //          ptr::write_volatile(  0x0801_0000 as u32, offset+checkpoint_size+1-1  as u32);
-    //      }
-    asm::dmb(); 
         if c_type {
             //write at the begining of checkpoint fram so magic number indicate jit or static checkpoint
              ptr::write_volatile(  fram_start_address.read() as *mut u32, 0xDEADBEEF as u32);
@@ -676,12 +657,11 @@ pub fn checkpoint(c_type:bool){
             start_address = start_address-4;
             
         }
-        asm::dmb();
-    asm::dmb();
+
     //mark the end of the stack
      ptr::write_volatile(  (fram_start_address.read()) as *mut u32, 0xf1f1_f1f1 as u32);
     fram_start_address.write(fram_start_address.read() + 4);
-    asm::dmb();
+
 
     // for i in 0..15{
     //      ptr::write_volatile(  0x0800_9060 as u32, r0_value as u32);
@@ -720,7 +700,7 @@ pub fn erase_all(flash: &mut FLASH){
 
 pub fn restore_globals(){
     unsafe{
-        let mut restore_ctr:u8 = 0;
+        let mut restore_ctr: u16 = 0;
         loop {
             if *counter == restore_ctr {
                 break;
@@ -737,7 +717,7 @@ pub fn restore_globals(){
 
 pub fn restore_globals1(){
     unsafe{
-        let mut restore_ctr:u8 = 0;
+        let mut restore_ctr:u16 = 0;
         loop {
             if *counter == restore_ctr {
                 break;

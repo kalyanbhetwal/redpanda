@@ -7,7 +7,6 @@ use crate::ptr::addr_of;
 use checkpoint::save_variables;
 use cortex_m::asm::nop;
 use panic_halt as _;
- 
 use cortex_m::peripheral::SCB;
 use cortex_m_rt::entry;
 use cortex_m::interrupt;
@@ -18,16 +17,16 @@ use cortex_m::peripheral::NVIC;
 
 mod checkpoint;
 use checkpoint::{checkpoint, restore, delete_pg, delete_all_pg, transcation_log, execution_mode, counter,start_atomic, end_atomic, initialization};
-// use instrument::my_proc_macro;
+use instrument::my_proc_macro;
 
-// #[link_section = ".fram_section"]
-// static mut x:u16 = 1;
-// #[link_section = ".fram_section"]
-// static mut y:u16 = 3;
-// #[link_section = ".fram_section"]
-// static mut z:u16 = 2;
-// #[link_section = ".fram_section"]
-// static mut t:u16 = 0xFF; //change to assign a random number
+#[link_section = ".fram_section"]
+static mut x:u16 = 8;
+#[link_section = ".fram_section"]
+static mut y:u16 = 3;
+#[link_section = ".fram_section"]
+static mut z:u16 = 2;
+#[link_section = ".fram_section"]
+static mut t:u16 = 0xFF; //change to assign a random number
 
 // #[link_section = ".fram_section"]
 // static mut rnd_array:[u16;5] = [10,12,14,15,2];
@@ -51,22 +50,22 @@ use checkpoint::{checkpoint, restore, delete_pg, delete_all_pg, transcation_log,
 //         }
 // }
 
-// #[my_proc_macro]
-// fn update(){
-//     let mut ya:u8 = 2;
-//     start_atomic();
-//     //unsafe{save_variables(addr_of!(x), 4);}
-//     unsafe{x = 5;}
-//     ya = ya + 2;
-//     end_atomic();
-// }
+#[my_proc_macro]
+fn update(){
+    let mut ya:u16 = 9;
+    start_atomic();
+    //unsafe{save_variables(addr_of!(x), 4);}
+    unsafe{x = 5;}
+    ya = ya + 2;
+    end_atomic();
+}
 
 #[no_mangle]
 pub extern "C" fn main() -> ! {
     //delete_pg(0x0803_0000 as u32);  //0x0807_F800
     initialization();
     // unsafe{rnd_array[4] = 1;}
-    //update();
+    update();
     hprintln!("reseting the counter ");
     //unsafe{ptr::write(counter as *mut u8 ,0);}
     
@@ -82,19 +81,19 @@ pub extern "C" fn main() -> ! {
     //let mut ans = [0;60];
     let mut ans;
     unsafe {
-        ptr::write_volatile((0x6000_0002) as *mut u8, 0xDD as u8); 
+        ptr::write_volatile((0x6000_0010) as *mut u16, 0xabcd as u16); 
 
-        ans =  ptr::read_volatile((0x6000_0002) as *mut u8); 
+        ans =  ptr::read_volatile((0x6000_0000) as *mut u16); 
 
         hprintln!("Value at index {:?}", ans).unwrap();
     }
 
-
+    // let mut ans;
     // unsafe{
-    //     for i in (0..=20).step_by(2){
-    //         ptr::write_volatile((0x6000_0000 + i) as *mut u8, 0xDD as u8); 
+    //     for i in (0..=1000).step_by(4){
+    //        // ptr::write_volatile((0x6000_0000 + i) as *mut u8, 0xDD as u8); 
 
-    //         ans = unsafe { ptr::read_volatile((0x6000_0000 +i) as *mut u8) };
+    //         ans = unsafe { ptr::read_volatile((0x6000_0000 +i) as *mut u32) };
     //         hprintln!("Value at index {}: {}", i, ans).unwrap();
     //     }  
     //    // hprintln!("Value at index {:?}", ans).unwrap();
