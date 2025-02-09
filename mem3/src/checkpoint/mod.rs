@@ -748,8 +748,8 @@ pub fn restore_globals1(){
 }
 pub fn restore()->bool{
     unsafe {
-        let mut fram_start_address = 0x0803_0000;
-        let packet_size = ptr::read_volatile(0x0803_0000 as *const u32);
+        let mut fram_start_address = 0x6003_0000;
+        let packet_size = ptr::read_volatile(0x603_0000 as *const u32);
         //let r0_flash = ptr::read_volatile(0x0800_9060 as *const u32);
         if packet_size == 0xffff_ffff {
             return false
