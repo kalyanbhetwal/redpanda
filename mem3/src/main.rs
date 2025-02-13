@@ -63,12 +63,18 @@ fn update(){
 #[no_mangle]
 pub extern "C" fn main() -> ! {
     //delete_pg(0x0803_0000 as u32);  //0x0807_F800
+   
     initialization();
+    //unsafe{ptr::write_volatile(  0x6000_9000 as *mut u32, 0);} //this line is for deleting the start_address
+    restore();
     // unsafe{rnd_array[4] = 1;}
+    //restore();
     update();
     hprintln!("reseting the counter ");
     //unsafe{ptr::write(counter as *mut u8 ,0);}
-    
+
+
+    checkpoint(false);
     
     // if unsafe{execution_mode}{
     //     checkpoint(false);
@@ -87,6 +93,7 @@ pub extern "C" fn main() -> ! {
 
         hprintln!("Value at index {:?}", ans).unwrap();
     }
+
 
     // let mut ans;
     // unsafe{

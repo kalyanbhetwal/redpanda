@@ -433,7 +433,7 @@ pub fn checkpoint(c_type:bool){
 
     unsafe {
         asm!(
-            "add sp, #280"
+            "add sp, #256"
         );
     }
     unsafe {
@@ -448,7 +448,7 @@ pub fn checkpoint(c_type:bool){
     }
     unsafe {
         asm!(
-            "sub sp, #280"
+            "sub sp, #256"
         );
     }
 
@@ -582,7 +582,7 @@ pub fn checkpoint(c_type:bool){
     // have to be extra careful for the sp value
     unsafe {
         asm!(
-            "add r0, #288",
+            "add r0, #264",
         );
     }
     unsafe {
@@ -612,8 +612,8 @@ pub fn checkpoint(c_type:bool){
 
          let stack_size = (start_address - end_address) + 4;
         // leaving first xyz K for program i.e start at 0x0801_0000
-         let mut fram_start_address = Volatile::new(0x6003_0000);
-         let mut fram_end_address = Volatile::new(0x6007_FFFF);    
+         let mut fram_start_address = Volatile::new(0x6000_9000);
+         let mut fram_end_address = Volatile::new(0x6000_FFFF);    
 
         let mut checkpoint_size= Volatile::new(0u32);
         asm::dmb();
@@ -623,21 +623,21 @@ pub fn checkpoint(c_type:bool){
         // 4. 4 bytes -> size of frame
         // 5. 4 bytes -> 0xDEADBEEF (magic number to indicate the static checkpoint)
         checkpoint_size.write(stack_size+4+16*4 +4 +4);
-        asm::dmb();
+        //asm::dmb();
 
-        loop{
-            let mut offset = ptr::read_volatile(fram_start_address.read() as *const u32);
-            if offset == 0xffff_ffff{
-                break;
-            }
-            fram_start_address.write(fram_start_address.read() + offset); 
-            if fram_start_address.read() + checkpoint_size.read() >= fram_end_address.read() {
-               //erase_all(&mut flash);
-               fram_start_address = Volatile::new(0x0803_0000);
-               break;
-            }
-        }
-        asm::dmb();
+        // loop{
+        //     let mut offset = ptr::read_volatile(fram_start_address.read() as *const u32);
+        //     if offset == 0{
+        //         break;
+        //     }
+        //     fram_start_address.write(fram_start_address.read() + offset); 
+        //     if fram_start_address.read() + checkpoint_size.read() >= fram_end_address.read() {
+        //        //erase_all(&mut flash);
+        //        fram_start_address = Volatile::new(0x0800_7000);
+        //        break;
+        //     }
+        // }
+        //asm::dmb();
         //write the size of packet at the begining of the packet
          ptr::write_volatile(  (fram_start_address.read()) as *mut u32, checkpoint_size.read() as u32); 
         fram_start_address.write(fram_start_address.read()+4);
@@ -648,6 +648,7 @@ pub fn checkpoint(c_type:bool){
         else{
              ptr::write_volatile(  fram_start_address.read() as *mut u32,  0x0000_0001 as u32);
         }
+        fram_start_address.write(fram_start_address.read()+4);
          while start_address >= end_address{
             let mut data = Volatile::new(0u32);
             data.write(core::ptr::read_volatile(start_address as * const u32));
@@ -748,34 +749,34 @@ pub fn restore_globals1(){
 }
 pub fn restore()->bool{
     unsafe {
-        let mut fram_start_address = 0x6003_0000;
-        let packet_size = ptr::read_volatile(0x603_0000 as *const u32);
+        let mut fram_start_address = 0x6000_9000;
+        let packet_size = ptr::read_volatile(0x6000_9000 as *const u32);
         //let r0_flash = ptr::read_volatile(0x0800_9060 as *const u32);
-        if packet_size == 0xffff_ffff {
+        if packet_size == 0 { //0xffff_ffff
             return false
         }
-        if  ptr::read_volatile((fram_start_address + packet_size) as *const u32)==0xffff_ffff{
-            return  false;
-        }
+        // if  ptr::read_volatile((fram_start_address + packet_size) as *const u32)== 0{
+        //     return  false;
+        // }
 
         let mut offset:u32 = 0;
         // think about multiple conditions where it could break
         //1. There could multiple failed checkpoints before a successful checkpoint.
         //2. The last checkpoint could be a failed(incomplete) checkpoint.
-        loop{
+        // loop{
             
-            offset = ptr::read_volatile(fram_start_address  as *const u32);
+        //     offset = ptr::read_volatile(fram_start_address  as *const u32);
   
-            if  ptr::read_volatile((fram_start_address + offset) as *const u32) == 0xffff_ffff{
-                break;
-            }
+        //     if  ptr::read_volatile((fram_start_address + offset) as *const u32) == 0{
+        //         break;
+        //     }
     
-            fram_start_address+=offset;
-        }
+        //     fram_start_address+=offset;
+        // }
         fram_start_address+=4;
 
         if  ptr::read_volatile(fram_start_address as *const u32) == 0xDEAD_BEEF{
-            restore_globals();
+            //restore_globals();
             //ptr::write(counter as *mut u8,0);
             *counter = 0;
         }
@@ -855,25 +856,26 @@ pub fn restore()->bool{
 
         asm!("adds r0, r0, #4");
         asm!( "LDR r14, [r0]");
+        asm!( "mov pc, r14");  // pc --> r15
 
-        asm!("POP {{r0}}");
+       // asm!("POP {{r0}}");
         
-        asm!("adds sp, sp, #56");
-        asm!("adds sp, sp, #8");
+    //     asm!("adds sp, sp, #56");
+    //     asm!("adds sp, sp, #8");
 
-        // asm!("POP {{r0, r1, r2, r3, r12, lr}}");
-        // asm!("LDMIA sp!, {{pc, xPSR}}");
+    //     // asm!("POP {{r0, r1, r2, r3, r12, lr}}");
+    //     // asm!("LDMIA sp!, {{pc, xPSR}}");
 
-        asm!("POP {{r0, r1, r2, r3}}");
-        asm!("adds sp, sp, #4");
-        asm!("POP {{r4}}");
-        asm!("adds sp, sp, #16"); //stack alignment issue
-        asm!("adds sp, sp, #64"); //stack alignment issue
+    //     asm!("POP {{r0, r1, r2, r3}}");
+    //     asm!("adds sp, sp, #4");
+    //     asm!("POP {{r4}}");
+    //     asm!("adds sp, sp, #16"); //stack alignment issue
+    //     asm!("adds sp, sp, #64"); //stack alignment issue
 
 
-       // asm!("POP {{r4, r5, r6, r7}}");
-       // asm!("MSR xPSR, r7");
-        asm!("mov pc, r4");    // pc is r15
+    //    // asm!("POP {{r4, r5, r6, r7}}");
+    //    // asm!("MSR xPSR, r7");
+    //     asm!("mov pc, r4");    // pc is r15
         //asm!("mov r15, r14"); // I am writing my own function to handle interrupt 
 
 
