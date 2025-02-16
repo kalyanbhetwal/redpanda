@@ -326,15 +326,15 @@ pub fn initialization(){
          // Set address setup time to 1 cycle
           w.addset().bits(0x1);
           // Set data setup time to 5 cycle
-          w.datast().bits(0x5);
+          w.datast().bits(0x90);
           // address hold time
           w.addhld().bits(0x1);
           // bus turn around
-          w.busturn().bits(0x0);
+          w.busturn().bits(0x90);
           // clock division
           w.clkdiv().bits(0x4);
           //data latency
-          w.datlat().bits(0x0);
+          w.datlat().bits(0x90);
           //access mode
           w.accmod().bits(0x0);
   
@@ -707,9 +707,14 @@ pub fn restore_globals(){
                 break;
             }
 
-           ptr::write(transcation_log as *mut u32, transcation_log + 8);
-           transcation_log += 12;
+           //ptr::write(transcation_log as *mut u32, transcation_log + 8);
+           //transcation_log += 12;
 
+           ptr::write(transcation_log as *mut u32 , data_loc as u32);
+           transcation_log += 4;
+           let size = ptr::read(transcation_log as *mut u32);
+           transcation_log += 8;
+           data_loc+= size;
            restore_ctr = restore_ctr + 1; 
         }
 

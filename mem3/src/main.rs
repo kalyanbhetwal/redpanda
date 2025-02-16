@@ -65,6 +65,7 @@ pub extern "C" fn main() -> ! {
     //delete_pg(0x0803_0000 as u32);  //0x0807_F800
    
     initialization();
+    hprintln!("reseting the counter ");
     //unsafe{ptr::write_volatile(  0x6000_9000 as *mut u32, 0);} //this line is for deleting the start_address
     restore();
     // unsafe{rnd_array[4] = 1;}
@@ -85,13 +86,13 @@ pub extern "C" fn main() -> ! {
     //debug::exit(debug::EXIT_SUCCESS);
 
     //let mut ans = [0;60];
-    let mut ans;
+    //let mut ans;
     unsafe {
         ptr::write_volatile((0x6000_0010) as *mut u16, 0xabcd as u16); 
 
-        ans =  ptr::read_volatile((0x6000_0000) as *mut u16); 
+        // ans =  ptr::read_volatile((0x6000_0000) as *mut u16); 
 
-        hprintln!("Value at index {:?}", ans).unwrap();
+        // hprintln!("Value at index {:?}", ans).unwrap();
     }
 
 
@@ -106,6 +107,8 @@ pub extern "C" fn main() -> ! {
     //    // hprintln!("Value at index {:?}", ans).unwrap();
 
     //   }
+
+    hprintln!("reseting the counter at the end ");
 
    loop {}
 }
