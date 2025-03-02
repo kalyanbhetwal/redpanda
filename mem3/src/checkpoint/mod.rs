@@ -1,6 +1,7 @@
 
 #![allow(unsafe_code, non_upper_case_globals)]
 pub mod my_flash;
+use cortex_m::register::basepri::read;
 use my_flash::{unlock, wait_ready, clear_error_flags, erase_page, write_to_flash};
 
 use core::mem;
@@ -424,6 +425,7 @@ pub fn start_atomic(){
 
 pub fn end_atomic(){
     unsafe {transcation_log = 0x60004000;}
+    unsafe {data_loc = 0x60005000;}
     unsafe {execution_mode = true;}
 
 }
@@ -702,19 +704,23 @@ pub fn erase_all(flash: &mut FLASH){
 pub fn restore_globals(){
     unsafe{
         let mut restore_ctr: u16 = 0;
+        let cnt = ptr::read_volatile(  0x60003000 as *mut u16);
+        hprintln!("cnt {}", *counter);
         loop {
-            if *counter == restore_ctr {
+            if cnt <= restore_ctr {
                 break;
             }
 
            //ptr::write(transcation_log as *mut u32, transcation_log + 8);
            //transcation_log += 12;
+           //let size = ptr::read(transcation_log as *mut u32);
+           ptr::write(*(transcation_log as *const u32)  as *mut u16 , *(data_loc as *const u16));
 
-           ptr::write(transcation_log as *mut u32 , data_loc as u32);
-           transcation_log += 4;
+           hprintln!("tx log {:x}  data_loc {:x}  data {:x}   add {:x}", transcation_log, data_loc, *(data_loc as *const u16), *(transcation_log as *const u32));
+           transcation_log += 4;  //(4 + 8)
            let size = ptr::read(transcation_log as *mut u32);
-           transcation_log += 8;
            data_loc+= size;
+           transcation_log += 4;
            restore_ctr = restore_ctr + 1; 
         }
 

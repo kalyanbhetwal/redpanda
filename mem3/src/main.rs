@@ -4,6 +4,7 @@
 use core::mem;
 use core::ptr;
 use crate::ptr::addr_of;
+use checkpoint::restore_globals;
 use checkpoint::save_variables;
 use cortex_m::asm::nop;
 use panic_halt as _;
@@ -20,13 +21,15 @@ use checkpoint::{checkpoint, restore, delete_pg, delete_all_pg, transcation_log,
 use instrument::my_proc_macro;
 
 #[link_section = ".fram_section"]
-static mut x:u16 = 8;
+static mut x:u16 = 14;
 #[link_section = ".fram_section"]
 static mut y:u16 = 3;
 #[link_section = ".fram_section"]
 static mut z:u16 = 2;
 #[link_section = ".fram_section"]
 static mut t:u16 = 0xFF; //change to assign a random number
+// #[link_section = ".fram_section"]
+// static  mut ya:u16 = 12;
 
 // #[link_section = ".fram_section"]
 // static mut rnd_array:[u16;5] = [10,12,14,15,2];
@@ -52,11 +55,11 @@ static mut t:u16 = 0xFF; //change to assign a random number
 
 #[my_proc_macro]
 fn update(){
-    let mut ya:u16 = 12;
+    let mut ya: u16 = 12;
     start_atomic();
     //unsafe{save_variables(addr_of!(x), 4);}
     unsafe{x = 5;}
-    ya = ya + 2;
+    unsafe{ya = ya + 2;}
     end_atomic();
 }
 
@@ -65,17 +68,24 @@ pub extern "C" fn main() -> ! {
     //delete_pg(0x0803_0000 as u32);  //0x0807_F800
    
     initialization();
-    hprintln!("reseting the counter ");
+    hprintln!("reseting the counter  1");
+    unsafe{ptr::write_volatile(  0x60003000 as *mut u32, 2);}
     //unsafe{ptr::write_volatile(  0x6000_9000 as *mut u32, 0);} //this line is for deleting the start_address
    //restore();
     // unsafe{rnd_array[4] = 1;}
-    //restore();
+    unsafe{ptr::write_volatile(  0x6000_0000 as *mut u32, 5);}
+
+    unsafe{ hprintln!("before data {}    and   {}", ptr::read(0x60000000 as *const u16), ptr::read(0x2000ffd6 as *const u16))};
+
+    restore_globals();
+
+    unsafe{ hprintln!("after data {}    and   {}", ptr::read(0x60000000 as *const u16), ptr::read(0x2000ffd6 as *const u16))};
     update();
-    hprintln!("reseting the counter ");
+    hprintln!("reseting the counter 2 ");
     //unsafe{ptr::write(counter as *mut u8 ,0);}
 
 
-    checkpoint(false);
+   // checkpoint(false);
     
     // if unsafe{execution_mode}{
     //     checkpoint(false);
