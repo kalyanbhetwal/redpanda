@@ -52,7 +52,7 @@ static mut t:u16 = 0xFF; //change to assign a random number
 
 #[my_proc_macro]
 fn update(){
-    let mut ya:u16 = 9;
+    let mut ya:u16 = 12;
     start_atomic();
     //unsafe{save_variables(addr_of!(x), 4);}
     unsafe{x = 5;}
@@ -67,7 +67,7 @@ pub extern "C" fn main() -> ! {
     initialization();
     hprintln!("reseting the counter ");
     //unsafe{ptr::write_volatile(  0x6000_9000 as *mut u32, 0);} //this line is for deleting the start_address
-    restore();
+   //restore();
     // unsafe{rnd_array[4] = 1;}
     //restore();
     update();

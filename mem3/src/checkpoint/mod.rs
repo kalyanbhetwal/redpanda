@@ -350,7 +350,7 @@ pub fn save_variables<T>(mem_loc: *const T, size: usize) {
         transcation_log += 4;
         ptr::write(transcation_log as *mut u32 , size as u32);
         transcation_log += 4;
-        ptr::write( data_loc as *mut u16 , (mem_loc as * const u16) as u16);
+        ptr::write( data_loc as *mut u16 , *(mem_loc as *const u16));
         data_loc+= 2;
         *counter = *counter + 1;
     }
@@ -781,7 +781,7 @@ pub fn restore()->bool{
         fram_start_address+=4;
 
         if  ptr::read_volatile(fram_start_address as *const u32) == 0xDEAD_BEEF{
-            //restore_globals();
+            restore_globals();
             //ptr::write(counter as *mut u8,0);
             *counter = 0;
         }
